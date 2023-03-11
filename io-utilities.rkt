@@ -46,15 +46,15 @@
       (delete-directory/files source-path)
       (displayln (list "copy error of" source-path))))
 
-;;todo error fix
 (define (get-move-compatible-filename file-name target-file-names)
-  (define (matcher inp)
-    (match inp
-      [(list name (hash-table (name _))) (matcher (list (increment-file-name name)) target-file-names)]
-      [(list name (list-no-order name _ ...)) (matcher (list (increment-file-name name)) target-file-names)]
-      [(list name _) name]
-    ))
-  (matcher (list file-name target-file-names)))
+  (define (on-hash f-name t-names)
+    (if (hash-has-key? t-names f-name) (on-hash (increment-file-name f-name) t-names) f-name))
+  (define (on-list f-name t-names)
+    (if (member f-name t-names) (on-list (increment-file-name f-name) t-names) f-name))
+  (match target-file-names
+    [(? hash?) (on-hash file-name target-file-names)]
+    [(? list?) (on-list file-name target-file-names)]
+    [_ 'no-list-or-hash-for-target-name-lookup]))
 
 (define (string->path-extension str)
   (path-get-extension 
