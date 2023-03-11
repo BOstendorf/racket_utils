@@ -1,7 +1,8 @@
 #lang racket
 (require  rackunit
           rackunit/text-ui
-          utils/listUtilities)
+          utils/listUtilities
+          utils/stringUtilities)
 
 (provide  
   dir-exists?->delete
@@ -21,31 +22,39 @@
   increment-file-name
   move-file
   get-move-compatible-filename
-
+  string->path-extension-string
+  file?
+  directory?
   )
 
-(define (increment-file-name file-name) 
-  (path-add-extension
-    (string->path-element 
-      (string-append 
-        (path-element->string 
-          (path-replace-extension file-name #"")) 
-        "1"))
-    (if (path-get-extension file-name)
-        (path-get-extension file-name)
-        #"")))
+;; tested
+(define (increment-file-name file-name)
+  (define (matcher inp)
+    (match inp
+      [(? string?) (matcher (list inp 'ext (string->path-extension-string inp)))]
+      [(? path?) (matcher (path->string (file-name-from-path inp)))]
+      [(list str 'ext ext) (matcher (list 'name (string-replace str ext "") 'ext ext))]
+      [(list 'name str 'ext ext) (string->path (string-append* str "1" (list ext)))]
+    ))
+  (file-name-from-path (matcher file-name)))
 
-(define (move-file source-path target-dir-path)
-  (if (copy-directory/files 
-        source-path   
-        (build-path 
-              target-dir-path
-              (get-move-compatible-filename 
-                    (file-name-from-path source-path)
-                    (map  file-name-from-path 
-                          (find-files-in-dir target-dir-path)))))
-      (delete-directory/files source-path)
-      (displayln (list "copy error of" source-path))))
+(define (move-file source-path target-dir-path [target-file-names #f])
+  (let* (
+    [f-name (file-name-from-path source-path)]
+    [t-f-names (or  target-file-names 
+                    (map  file-name-from-path
+                          (find-files-in-dir target-dir-path)))]
+    [goal-f-name (get-move-compatible-filename f-name t-f-names)]
+    [new-target-names (if (list? t-f-names) 
+                          (cons goal-f-name t-f-names) 
+                          (hash-set t-f-names goal-f-name 'new))])
+    (if (copy-directory/files source-path 
+                              (build-path target-dir-path 
+                                          goal-f-name))
+        (begin  (delete-directory/files source-path)
+                new-target-names)
+        (begin  (displayln (list "copy error of" source-path))
+                t-f-names))))
 
 (define (get-move-compatible-filename file-name target-file-names)
   (define (on-hash f-name t-names)
@@ -57,13 +66,24 @@
     [(? list?) (on-list file-name target-file-names)]
     [_ 'no-list-or-hash-for-target-name-lookup]))
 
-(define (string->path-extension str)
-  (path-get-extension 
-      (string->path-element 
-          (if (string-prefix? str ".")
-              (string-append "prefix" str)
-              str))))
 
+;; tested
+(define (string->path-extension str)
+  (define (matcher inp)
+    (match inp
+      [(and str (? string?)(? (curryr string-prefix? "."))) (matcher (list 'dotfile (substring str 1)))]
+      [(list 'dotfile str) (string->bytes/locale (string-trim-until str "."))]
+      [(and str (? string?)) (string->bytes/locale (string-trim-until str "."))]
+      [_ 'something-went-wrong]
+    ))
+  (matcher (last (string-split str "/")))
+  )
+
+;; tested
+(define (string->path-extension-string str)
+  (bytes->string/locale (string->path-extension str)))
+
+;; tested manually
 (define (get-full-path path-or-path-string)
   (let ([path (resolve-path path-or-path-string)])
     (if (absolute-path? path)
@@ -92,9 +112,27 @@
   (matcher (list (resolve-path path-inp) extension-list))
 )
 
-(define (extension-filter extension-list)
-  (curryr one-of-extensions extension-list))
+;; tested
+(define (file? path)
+  (match (resolve-path path)
+    [(and (? path?) (app file-or-directory-type 'file)) #t]
+    [_ #f]
+  ))
 
+;; tested
+(define (directory? path)
+  (match (resolve-path path)
+    [(and (? path?) (app file-or-directory-type 'directory)) #t]
+    [_ #f]
+  ))
+
+;; tested
+(define (extension-filter extension-list)
+  (lambda (path) 
+          (and  (equal? (file-or-directory-type path) 'file) 
+                (one-of-extensions path extension-list))))
+
+;; tested
 (define (find-files-in-dir path [extension-list '()])
   (let ([path (resolve-path path)])
     (filter (extension-filter extension-list)
@@ -168,6 +206,138 @@
 ;;; ---------------------------------------------
 ;;; test cases - invoke using thunk execute-tests
 ;;; ---------------------------------------------
+
+(define increment-file-name-tests
+  (test-suite "test cases for increment-file-name"
+    (test-equal? "path-string incremented"
+          (increment-file-name "someDir/some-file.txt")
+          (string->path "some-file1.txt"))
+    (test-equal? "path increment"
+          (increment-file-name (string->path "someDir/some-file.txt.zip"))
+          (string->path "some-file1.txt.zip"))
+    (test-equal? "only file-name as string"
+          (increment-file-name "test.file.name")
+          (string->path-element "test1.file.name"))
+    ))
+
+(define string->path-extension-tests
+  (test-suite "tests for extracting correct extension from path-string"
+        (test-equal? "path-string end on .txt"
+              (string->path-extension "test.txt")
+              #".txt")
+        (test-equal? "composite path-string end on .txt"
+              (string->path-extension "someDir/test.txt")
+              #".txt")
+        (test-equal? "path-string end on .jpg.txt"
+              (string->path-extension "test.jpg.txt")
+              #".jpg.txt")
+        (test-equal? "dotfile returns no extension"
+              (string->path-extension ".config")
+              #"")
+        (test-equal? "dotfile in composite path-string returns no extension"
+              (string->path-extension "someDir/.config")
+              #"")))
+
+(define string->path-extension-string-tests
+  (test-suite "tests for extracting correct extension as string"
+        (test-equal? "path-string end on .txt"
+              (string->path-extension-string "test.txt")
+              ".txt")
+        (test-equal? "composite path-string end on .txt"
+              (string->path-extension-string "someDir/test.txt")
+              ".txt")
+        (test-equal? "path-string end on .jpg.txt"
+              (string->path-extension-string "test.jpg.txt")
+              ".jpg.txt")
+        (test-equal? "dotfile returns no extension"
+              (string->path-extension-string ".config")
+              "")
+        (test-equal? "dotfile in composite path-string returns no extension"
+              (string->path-extension-string "someDir/.config")
+              "")))
+
+(define extension-filter-tests
+  (let ([dir-path-string "/home/me/racketUnitTestDir"]
+        [dir-path (string->path "/home/me/racketUnitTestDir")]
+        [f-path-string "/home/me/racketUnitTestDir/test.txt"]
+        [f-path (string->path "/home/me/racketUnitTestDir/test.txt")])
+  (test-suite "test cases for extension-filter"
+    #:before (lambda () (mkdir dir-path)
+                        (line-writer f-path '("Line")))
+    #:after (lambda () (dir-exists?->delete dir-path))
+        (test-true "returns procedure"
+              (procedure? (extension-filter '())))
+        (test-exn "raises exception when no valid list of extensions provided"
+              exn?
+              (lambda () ((extension-filter '('txt)) f-path)))
+        (test-true "path-string points to file ; empty extension list"
+              ((extension-filter '()) f-path-string))
+        (test-true "path points to file ; empty extension list"
+              ((extension-filter '()) f-path))
+        (test-suite "extensions given as strings"
+          (test-false "false when path-string points to dir"
+                ((extension-filter '(".txt")) dir-path-string))
+          (test-false "false when path points to dir"
+                ((extension-filter '(".txt")) dir-path))
+          (test-false "path-string points to file not in extension list"
+                ((extension-filter '(".mp3" ".mp4")) f-path-string))
+          (test-false "path points to file not in extension list"
+                ((extension-filter '(".mp3" ".mp4")) f-path))
+          (test-true "path-string points to file in extension list"
+                ((extension-filter '(".mp3" ".txt")) f-path-string))
+          (test-true "path points to file in extension list"
+                ((extension-filter '(".mp3" ".txt")) f-path))
+        )
+        (test-suite "extensions given as bytes"
+          (test-false "false when path-string points to dir"
+                ((extension-filter '(#".txt")) dir-path-string))
+          (test-false "false when path points to dir"
+                ((extension-filter '(#".txt")) dir-path))
+          (test-false "path-string points to file not in extension list"
+                ((extension-filter '(#".mp3" #".mp4")) f-path-string))
+          (test-false "path points to file not in extension list"
+                ((extension-filter '(#".mp3" #".mp4")) f-path))
+          (test-true "path-string points to file in extension list"
+                ((extension-filter '(#".mp3" #".txt")) f-path-string))
+          (test-true "path points to file in extension list"
+                ((extension-filter '(#".mp3" #".txt")) f-path))
+        )
+  )))
+
+(define file?-dir?-predicate-tests
+  (test-suite "tests for preicate file? and directory?"
+    #:before (lambda () (mkdir "/home/me/racketUnitTestDir")
+                        (line-writer "/home/me/racketUnitTestDir/test.txt" '("Line")))
+    #:after (lambda () (dir-exists?->delete "/home/me/racketUnitTestDir"))
+    (test-true "path-string is file"
+          (file? "/home/me/racketUnitTestDir/test.txt"))
+    (test-true "path is file"
+          (file? (string->path "/home/me/racketUnitTestDir/test.txt")))
+    (test-true "path-string is dir"
+          (directory? "/home/me/racketUnitTestDir"))
+    (test-true "path is dir"
+          (directory? (string->path "/home/me/racketUnitTestDir")))
+    (test-true "path-string is dir"
+          (directory? "/home/me/racketUnitTestDir/"))
+    (test-true "path is dir"
+          (directory? (string->path "/home/me/racketUnitTestDir/")))
+    (test-false "path-string is file"
+          (directory? "/home/me/racketUnitTestDir/test.txt"))
+    (test-false "path is file"
+          (directory? (string->path "/home/me/racketUnitTestDir/test.txt")))
+    (test-false "path-string is dir"
+          (file? "/home/me/racketUnitTestDir"))
+    (test-false "path is dir"
+          (file? (string->path "/home/me/racketUnitTestDir")))
+    (test-false "path-string is dir"
+          (file? "/home/me/racketUnitTestDir/"))
+    (test-false "path is dir"
+          (file? (string->path "/home/me/racketUnitTestDir/")))
+    (test-false "symbol instead of file path"
+          (file? 'other))
+    (test-false "symbol instead of dir path"
+          (directory? 'other))
+    ))
 
 (define one-of-extensions-tests
   (test-suite "tests for one-of-extensions"
@@ -338,6 +508,12 @@
 
 (define delete/create-dir-tests
   (test-suite "tests for creation and deletion of directories"
+    #:before
+      (lambda ()
+        (dir-exists?->delete "/home/me/racketUnitTestDir"))
+    #:after 
+      (lambda ()
+        (dir-exists?->delete "/home/me/racketUnitTestDir"))
     (check-equal? (mkdir "~/racketUnitTestDir") (void) "try creating dir using string with home-fir alias for location")
     (check-equal? (dir-exists?->delete "~/racketUnitTestDir") #t "try deleting dir with home-dir alias using string for location")))
 
@@ -358,5 +534,10 @@
   (run-tests resolve-path-tests)
   (run-tests directory-list-full-paths-tests)
   (run-tests one-of-extensions-tests)
-  ;(run-tests find-files-in-dir-tests)
+  (run-tests find-files-in-dir-tests)
+  (run-tests file?-dir?-predicate-tests)
+  (run-tests extension-filter-tests)
+  (run-tests string->path-extension-tests)
+  (run-tests increment-file-name-tests)
+  (run-tests string->path-extension-string-tests)
 )
