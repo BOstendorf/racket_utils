@@ -70,6 +70,7 @@
         path
         (build-path (current-directory) path))))
 
+;; tested
 (define (one-of-extensions path-inp extension-list)
   (define (matcher inp)
     (match inp
@@ -254,14 +255,14 @@
                               (string->path "/home/me/racketUnitTestDir/test.mp3")
                               (string->path "/home/me/racketUnitTestDir/test.jpg3"))
                         (find-files-in-dir "/home/me/racketUnitTestDir"))
-                (equal? (length (find-files-in-dir "/home/me/racketUnitTestDir") 4))))
+                (equal? (length (find-files-in-dir "/home/me/racketUnitTestDir")) 4)))
     (test-true "list full paths of files in dir with no sub dir - no extension restriction"
           (and (member* (list (string->path "/home/me/racketUnitTestDir/sub1/test.txt")
                               (string->path "/home/me/racketUnitTestDir/sub1/test.mp4")
                               (string->path "/home/me/racketUnitTestDir/sub1/test.mp3")
                               (string->path "/home/me/racketUnitTestDir/sub1/test.jpg3"))
                         (find-files-in-dir "/home/me/racketUnitTestDir/sub1"))
-                (equal? (length (find-files-in-dir "/home/me/racketUnitTestDir/sub1") 4))))
+                (equal? (length (find-files-in-dir "/home/me/racketUnitTestDir/sub1")) 4)))
     (test-equal? "empty list for listing files in empty dir - no extension restrictions"
                 (find-files-in-dir "/home/me/racketUnitTestDir/sub2")
                 '())
@@ -269,23 +270,23 @@
           (and (member* (list (string->path "/home/me/racketUnitTestDir/test.txt")
                               (string->path "/home/me/racketUnitTestDir/test.jpg3"))
                         (find-files-in-dir "/home/me/racketUnitTestDir" '(".txt" ".jpg3")))
-                (equal? (length (find-files-in-dir "/home/me/racketUnitTestDir" '(".txt" ".jpg3")) 2))))
+                (equal? (length (find-files-in-dir "/home/me/racketUnitTestDir" '(".txt" ".jpg3"))) 2)))
     (test-true "list full paths of files in dir with no sub dir - restriction to extensions .txt and jpg3"
           (and (member* (list (string->path "/home/me/racketUnitTestDir/sub1/test.txt")
                               (string->path "/home/me/racketUnitTestDir/sub1/test.jpg3"))
                         (find-files-in-dir "/home/me/racketUnitTestDir/sub1" '(".txt" ".jpg3")))
-                (equal? (length (find-files-in-dir "/home/me/racketUnitTestDir/sub1" '(".txt" ".jpg3")) 2))))
+                (equal? (length (find-files-in-dir "/home/me/racketUnitTestDir/sub1" '(".txt" ".jpg3"))) 2)))
     (test-equal? "empty list for listing files in empty dir - restriction to extensions .txt and jpg3"
                 (find-files-in-dir "/home/me/racketUnitTestDir/sub2" '(".txt" ".jpg3"))
                 '())
     (test-true "list full paths of files in dir with sub dir - restriction to extensions not present jpg2"
           (and (member* (list )
                         (find-files-in-dir "/home/me/racketUnitTestDir" '(".jpg2")))
-                (equal? (length (find-files-in-dir "/home/me/racketUnitTestDir" '(".jpg2")) 0))))
+                (equal? (length (find-files-in-dir "/home/me/racketUnitTestDir" '(".jpg2"))) 0)))
     (test-true "list full paths of files in dir with no sub dir - restriction to extensions not present jpg2"
           (and (member* (list )
                         (find-files-in-dir "/home/me/racketUnitTestDir/sub1" '(".jpg2")))
-                (equal? (length (find-files-in-dir "/home/me/racketUnitTestDir/sub1" '(".jpg2")) 0))))
+                (equal? (length (find-files-in-dir "/home/me/racketUnitTestDir/sub1" '(".jpg2"))) 0)))
                 ))
 
 (define directory-list-full-paths-tests
@@ -347,4 +348,5 @@
   (run-tests resolve-path-tests)
   (run-tests directory-list-full-paths-tests)
   (run-tests one-of-extensions-tests)
+  (run-tests find-files-in-dir-tests)
 )
