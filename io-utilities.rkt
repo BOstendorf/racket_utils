@@ -1,6 +1,7 @@
 #lang racket
 (require  rackunit
-          rackunit/text-ui)
+          rackunit/text-ui
+          utils/listUtilities)
 
 (provide  
   dir-exists?->delete
@@ -78,9 +79,11 @@
                                       'file)))) 
               _) 'path-is-no-file]
       [(list _ '()) #t]
-      [(list path exts) (member (path-get-extension path) exts)]
+      [(list path (and exts (list (? string?) ...))) (matcher (list path (map string->bytes/locale exts)))]
+      [(list path (and exts (list (? bytes?) ...))) (and (member (path-get-extension path) exts) #t)]
+      [(list _ _) 'no-valid-list-of-extensions]
     ))
-  (matcher (resolve-path path-inp extension-list))
+  (matcher (list (resolve-path path-inp) extension-list))
 )
 
 (define (extension-filter extension-list)
@@ -92,6 +95,7 @@
             (directory-list-full-paths path)))
   )
 
+;; tested
 (define (directory-list-full-paths path)
   (let ([path (resolve-path path)])
     (map  (lambda (listed-elem) 
@@ -159,6 +163,155 @@
 ;;; test cases - invoke using thunk execute-tests
 ;;; ---------------------------------------------
 
+(define one-of-extensions-tests
+  (test-suite "tests for one-of-extensions"
+    #:before
+      (lambda ()
+        (mkdir "/home/me/racketUnitTestDir")
+        (mkdir "/home/me/racketUnitTestDir/sub1")
+        (mkdir "/home/me/racketUnitTestDir/sub2")
+        (line-writer "/home/me/racketUnitTestDir/test.txt" '("Line"))
+        (line-writer "/home/me/racketUnitTestDir/test.mp4" '("Line"))
+        (line-writer "/home/me/racketUnitTestDir/test.mp3" '("Line"))
+        (line-writer "/home/me/racketUnitTestDir/test.jpg3" '("Line"))
+        (line-writer "/home/me/racketUnitTestDir/sub1/test.txt" '("Line"))
+        (line-writer "/home/me/racketUnitTestDir/sub1/test.mp4" '("Line"))
+        (line-writer "/home/me/racketUnitTestDir/sub1/test.mp3" '("Line"))
+        (line-writer "/home/me/racketUnitTestDir/sub1/test.jpg3" '("Line"))
+        
+        )
+    #:after 
+      (lambda () (dir-exists?->delete "/home/me/racketUnitTestDir"))
+    (test-suite "path extensions are provided as strings"
+      (test-true "path ends on .txt .txt one of extensions"
+            (one-of-extensions (string->path "/home/me/racketUnitTestDir/test.txt") '(".txt" ".mp3")))
+      (test-true "path-string ends on .txt .txt one of extensions"
+            (one-of-extensions "/home/me/racketUnitTestDir/test.txt" '(".txt" ".mp3")))
+      (test-equal? "provided path does not point to file"
+            (one-of-extensions (string->path "/home/me/racketUnitTestDir") '(".txt" ".mp3"))
+            'path-is-no-file)
+      (test-equal? "provided path-string does not point to file"
+            (one-of-extensions "/home/me/racketUnitTestDir" '(".txt" ".mp3"))
+            'path-is-no-file)
+      (test-false "path extension does not match listed extensions"
+            (one-of-extensions (string->path "/home/me/racketUnitTestDir/test.txt") '(".mp4")))
+      (test-false "path-string extension does not match listed extensions"
+            (one-of-extensions "/home/me/racketUnitTestDir/test.txt" '(".mp4")))
+    )
+    
+    (test-suite "path extensions are provided as bytes"
+      (test-true "path ends on .txt .txt one of extensions"
+            (one-of-extensions (string->path "/home/me/racketUnitTestDir/test.txt") '(#".txt" #".mp3")))
+      (test-true "path-string ends on .txt .txt one of extensions"
+            (one-of-extensions "/home/me/racketUnitTestDir/test.txt" '(#".txt" #".mp3")))
+      (test-equal? "provided path does not point to file"
+            (one-of-extensions (string->path "/home/me/racketUnitTestDir") '(#".txt" #".mp3"))
+            'path-is-no-file)
+      (test-equal? "provided path-string does not point to file"
+            (one-of-extensions "/home/me/racketUnitTestDir" '(#".txt" #".mp3"))
+            'path-is-no-file)
+      (test-false "path extension does not match listed extensions"
+            (one-of-extensions (string->path "/home/me/racketUnitTestDir/test.txt") '(#".mp4")))
+      (test-false "path-string extension does not match listed extensions"
+            (one-of-extensions "/home/me/racketUnitTestDir/test.txt" '(#".mp4")))      
+    )
+    (test-suite "incorrect extension arguments"
+      (test-equal? "extensions do not map to bytes - path provided"
+            (one-of-extensions (string->path "/home/me/racketUnitTestDir/test.txt") '('txt 'mp3))
+            'no-valid-list-of-extensions)
+      (test-equal? "extensions do not map to bytes - path string provided"
+            (one-of-extensions "/home/me/racketUnitTestDir/test.txt" '('txt 'mp3))
+            'no-valid-list-of-extensions)
+    )
+    (test-true "no extensions set as restrictions - path-string provided"
+          (one-of-extensions "/home/me/racketUnitTestDir/test.txt" '()))
+    (test-true "no extensions set as restrictions - path provided"
+          (one-of-extensions (string->path "/home/me/racketUnitTestDir/test.txt") '()))
+  ))
+
+(define find-files-in-dir-tests
+  (test-suite "test for getting correct full paths of files with selected extensions in dir"
+    #:before
+      (lambda ()
+        (mkdir "/home/me/racketUnitTestDir")
+        (mkdir "/home/me/racketUnitTestDir/sub1")
+        (mkdir "/home/me/racketUnitTestDir/sub2")
+        (line-writer "/home/me/racketUnitTestDir/test.txt" '("Line"))
+        (line-writer "/home/me/racketUnitTestDir/test.mp4" '("Line"))
+        (line-writer "/home/me/racketUnitTestDir/test.mp3" '("Line"))
+        (line-writer "/home/me/racketUnitTestDir/test.jpg3" '("Line"))
+        (line-writer "/home/me/racketUnitTestDir/sub1/test.txt" '("Line"))
+        (line-writer "/home/me/racketUnitTestDir/sub1/test.mp4" '("Line"))
+        (line-writer "/home/me/racketUnitTestDir/sub1/test.mp3" '("Line"))
+        (line-writer "/home/me/racketUnitTestDir/sub1/test.jpg3" '("Line"))
+        
+        )
+    #:after 
+      (lambda () (dir-exists?->delete "/home/me/racketUnitTestDir"))
+    (test-true "list full paths of files in dir with sub dir - no extension restriction"
+          (and (member* (list (string->path "/home/me/racketUnitTestDir/test.txt")
+                              (string->path "/home/me/racketUnitTestDir/test.mp4")
+                              (string->path "/home/me/racketUnitTestDir/test.mp3")
+                              (string->path "/home/me/racketUnitTestDir/test.jpg3"))
+                        (find-files-in-dir "/home/me/racketUnitTestDir"))
+                (equal? (length (find-files-in-dir "/home/me/racketUnitTestDir") 4))))
+    (test-true "list full paths of files in dir with no sub dir - no extension restriction"
+          (and (member* (list (string->path "/home/me/racketUnitTestDir/sub1/test.txt")
+                              (string->path "/home/me/racketUnitTestDir/sub1/test.mp4")
+                              (string->path "/home/me/racketUnitTestDir/sub1/test.mp3")
+                              (string->path "/home/me/racketUnitTestDir/sub1/test.jpg3"))
+                        (find-files-in-dir "/home/me/racketUnitTestDir/sub1"))
+                (equal? (length (find-files-in-dir "/home/me/racketUnitTestDir/sub1") 4))))
+    (test-equal? "empty list for listing files in empty dir - no extension restrictions"
+                (find-files-in-dir "/home/me/racketUnitTestDir/sub2")
+                '())
+    (test-true "list full paths of files in dir with sub dir - restriction to extensions .txt and jpg3"
+          (and (member* (list (string->path "/home/me/racketUnitTestDir/test.txt")
+                              (string->path "/home/me/racketUnitTestDir/test.jpg3"))
+                        (find-files-in-dir "/home/me/racketUnitTestDir" '(".txt" ".jpg3")))
+                (equal? (length (find-files-in-dir "/home/me/racketUnitTestDir" '(".txt" ".jpg3")) 2))))
+    (test-true "list full paths of files in dir with no sub dir - restriction to extensions .txt and jpg3"
+          (and (member* (list (string->path "/home/me/racketUnitTestDir/sub1/test.txt")
+                              (string->path "/home/me/racketUnitTestDir/sub1/test.jpg3"))
+                        (find-files-in-dir "/home/me/racketUnitTestDir/sub1" '(".txt" ".jpg3")))
+                (equal? (length (find-files-in-dir "/home/me/racketUnitTestDir/sub1" '(".txt" ".jpg3")) 2))))
+    (test-equal? "empty list for listing files in empty dir - restriction to extensions .txt and jpg3"
+                (find-files-in-dir "/home/me/racketUnitTestDir/sub2" '(".txt" ".jpg3"))
+                '())
+    (test-true "list full paths of files in dir with sub dir - restriction to extensions not present jpg2"
+          (and (member* (list )
+                        (find-files-in-dir "/home/me/racketUnitTestDir" '(".jpg2")))
+                (equal? (length (find-files-in-dir "/home/me/racketUnitTestDir" '(".jpg2")) 0))))
+    (test-true "list full paths of files in dir with no sub dir - restriction to extensions not present jpg2"
+          (and (member* (list )
+                        (find-files-in-dir "/home/me/racketUnitTestDir/sub1" '(".jpg2")))
+                (equal? (length (find-files-in-dir "/home/me/racketUnitTestDir/sub1" '(".jpg2")) 0))))
+                ))
+
+(define directory-list-full-paths-tests
+  (test-suite "tests if directory-list-full-paths-tests returns the correct full paths"
+    #:before 
+      (lambda () 
+        (mkdir "/home/me/racketUnitTestDir") 
+        (line-writer "/home/me/racketUnitTestDir/testFile" '("Line"))
+        (mkdir "/home/me/racketUnitTestDir/.hidden") 
+        (line-writer "/home/me/racketUnitTestDir/.hidden/testFile" '("Line"))
+        (mkdir "/home/me/racketUnitTestDir/.hidden/emptyDir"))
+    #:after 
+      (lambda ()
+        (dir-exists?->delete "/home/me/racketUnitTestDir"))
+    (test-equal? "list expected paths in hidden dir"
+          (directory-list-full-paths "/home/me/racketUnitTestDir/.hidden")
+          (list (string->path "/home/me/racketUnitTestDir/.hidden/emptyDir")
+                (string->path "/home/me/racketUnitTestDir/.hidden/testFile")))
+    (test-equal? "list expected paths in dir with hidden sub dir"
+          (directory-list-full-paths "/home/me/racketUnitTestDir")
+          (list (string->path "/home/me/racketUnitTestDir/.hidden")
+                (string->path "/home/me/racketUnitTestDir/testFile")))
+    (test-equal? "list of paths empty for empt dir"
+          (directory-list-full-paths "/home/me/racketUnitTestDir/.hidden/emptyDir")
+          '())))
+
 (define resolve-path-tests
   (test-suite "tests for path resolution. Resolve home dir alias path. Get path from path string"
     (test-equal? "resolve alias for home dir"
@@ -192,4 +345,6 @@
   (run-tests get-name-of-file-path-tests)
   (run-tests delete/create-dir-tests)
   (run-tests resolve-path-tests)
+  (run-tests directory-list-full-paths-tests)
+  (run-tests one-of-extensions-tests)
 )
