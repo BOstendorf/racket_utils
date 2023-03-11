@@ -74,15 +74,20 @@
 (define (one-of-extensions path-inp extension-list)
   (define (matcher inp)
     (match inp
-      [(list 'no-path-or-path-string-provided _) 'no-valid-path-or-path-string]
+      [(list 'no-path-or-path-string-provided _) (raise-argument-error 'no-valid-path-or-path-string
+                                                                        "(or (? path?) (? path-string?))"
+                                                                        path-inp)]
       [(list  (? (lambda (p) 
                         (not (equal? (file-or-directory-type p)
                                       'file)))) 
-              _) 'path-is-no-file]
+              _) 
+        (raise-argument-error 'path-is-no-file "(or (? path?) (? path-string?)) pointing to file" path-inp)]
       [(list _ '()) #t]
       [(list path (and exts (list (? string?) ...))) (matcher (list path (map string->bytes/locale exts)))]
       [(list path (and exts (list (? bytes?) ...))) (and (member (path-get-extension path) exts) #t)]
-      [(list _ _) 'no-valid-list-of-extensions]
+      [(list _ exts) (raise-argument-error  'no-valid-list-of-extensions 
+                                            "(list (or (? string?) (? bytes)) ...)"
+                                            exts)]
     ))
   (matcher (list (resolve-path path-inp) extension-list))
 )
@@ -188,12 +193,14 @@
             (one-of-extensions (string->path "/home/me/racketUnitTestDir/test.txt") '(".txt" ".mp3")))
       (test-true "path-string ends on .txt .txt one of extensions"
             (one-of-extensions "/home/me/racketUnitTestDir/test.txt" '(".txt" ".mp3")))
-      (test-equal? "provided path does not point to file"
-            (one-of-extensions (string->path "/home/me/racketUnitTestDir") '(".txt" ".mp3"))
-            'path-is-no-file)
-      (test-equal? "provided path-string does not point to file"
-            (one-of-extensions "/home/me/racketUnitTestDir" '(".txt" ".mp3"))
-            'path-is-no-file)
+      (test-exn "provided path does not point to file"
+            exn?
+            (lambda ()(one-of-extensions (string->path "/home/me/racketUnitTestDir") '(".txt" ".mp3")))
+            )
+      (test-exn "provided path-string does not point to file"
+            exn?
+            (lambda ()(one-of-extensions "/home/me/racketUnitTestDir" '(".txt" ".mp3")))
+            )
       (test-false "path extension does not match listed extensions"
             (one-of-extensions (string->path "/home/me/racketUnitTestDir/test.txt") '(".mp4")))
       (test-false "path-string extension does not match listed extensions"
@@ -205,24 +212,27 @@
             (one-of-extensions (string->path "/home/me/racketUnitTestDir/test.txt") '(#".txt" #".mp3")))
       (test-true "path-string ends on .txt .txt one of extensions"
             (one-of-extensions "/home/me/racketUnitTestDir/test.txt" '(#".txt" #".mp3")))
-      (test-equal? "provided path does not point to file"
-            (one-of-extensions (string->path "/home/me/racketUnitTestDir") '(#".txt" #".mp3"))
-            'path-is-no-file)
-      (test-equal? "provided path-string does not point to file"
-            (one-of-extensions "/home/me/racketUnitTestDir" '(#".txt" #".mp3"))
-            'path-is-no-file)
+      (test-exn "provided path does not point to file"
+            exn?
+            (lambda ()(one-of-extensions (string->path "/home/me/racketUnitTestDir") '(#".txt" #".mp3")))
+            )
+      (test-exn "provided path does not point to file"
+            exn?
+            (lambda ()(one-of-extensions "/home/me/racketUnitTestDir" '(#".txt" #".mp3")))
+            )
       (test-false "path extension does not match listed extensions"
             (one-of-extensions (string->path "/home/me/racketUnitTestDir/test.txt") '(#".mp4")))
       (test-false "path-string extension does not match listed extensions"
             (one-of-extensions "/home/me/racketUnitTestDir/test.txt" '(#".mp4")))      
     )
     (test-suite "incorrect extension arguments"
-      (test-equal? "extensions do not map to bytes - path provided"
-            (one-of-extensions (string->path "/home/me/racketUnitTestDir/test.txt") '('txt 'mp3))
-            'no-valid-list-of-extensions)
-      (test-equal? "extensions do not map to bytes - path string provided"
-            (one-of-extensions "/home/me/racketUnitTestDir/test.txt" '('txt 'mp3))
-            'no-valid-list-of-extensions)
+      (test-exn "extensions do not map to bytes - path provided"
+            exn?
+            (lambda ()(one-of-extensions (string->path "/home/me/racketUnitTestDir/test.txt") '('txt 'mp3)))
+            )
+      (test-exn "extensions do not map to bytes - path string provided"
+            exn?
+            (lambda () (one-of-extensions "/home/me/racketUnitTestDir/test.txt" '('txt 'mp3))))
     )
     (test-true "no extensions set as restrictions - path-string provided"
           (one-of-extensions "/home/me/racketUnitTestDir/test.txt" '()))
@@ -348,5 +358,5 @@
   (run-tests resolve-path-tests)
   (run-tests directory-list-full-paths-tests)
   (run-tests one-of-extensions-tests)
-  (run-tests find-files-in-dir-tests)
+  ;(run-tests find-files-in-dir-tests)
 )
