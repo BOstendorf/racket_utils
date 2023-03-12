@@ -170,7 +170,7 @@
                                         "~/")) #t)) (resolve-path (list 'home-rest (substring path 2)))]
     [(list 'home-rest "") (find-system-path 'home-dir)]
     [(list 'home-rest p-string) (build-path (find-system-path 'home-dir) p-string)]
-    [(? string?) (string->path path)]
+    [(? path-string?) (string->path path)]
     [(? path-for-some-system?) path]
     [_ 'no-path-or-path-string-provided]))
 
