@@ -1,5 +1,6 @@
 #lang racket
 (require "./listUtilities.rkt")
+(require "./io-utilities.rkt")
 
 ;; tested
 (struct file-image (path name pure-name lines content-type links-to linked-from))
@@ -61,5 +62,25 @@
                                   f-image 
                                   [content-type c-type])))
         f-image-hash)))
+
+
+
+(define (ls-dir->f-image-by-attr-hash dir-path f-image-attr)
+  (if (not (file-image-attribute? f-image-attr))
+      (raise-argument-error 'ls-dir->fimage-by-attr-hash "file-image-attribute? -> one of 
+                              file-image-path 
+                              file-image-name 
+                              file-image-pure-name 
+                              file-image-lines 
+                              file-image-content-type 
+                              file-image-links-to 
+                              file-image-linked-from"
+                            1 dir-path)
+      (make-immutable-hash 
+                      (map (lambda  (f-image)
+                                    (cons (f-image-attr f-image)
+                                          f-image))
+                            (map build-file-image (find-files-in-dir dir-path)))))
+)
 
 (provide (all-defined-out))
