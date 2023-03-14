@@ -170,8 +170,8 @@
                                         "~/")) #t)) (resolve-path (list 'home-rest (substring path 2)))]
     [(list 'home-rest "") (find-system-path 'home-dir)]
     [(list 'home-rest p-string) (build-path (find-system-path 'home-dir) p-string)]
-    [(? path-string?) (string->path path)]
     [(? path-for-some-system?) path]
+    [(? path-string?) (string->path path)]
     [_ 'no-path-or-path-string-provided]))
 
 ;; tested manually
@@ -504,7 +504,16 @@
     (test-case "relative path from relative path string"
       (check-true (path? (resolve-path "tmp/path")) "expected path tmp/path to resolve to path")
       (check-true (relative-path? (resolve-path "tmp/path")) "expected path tmp/path to resovle to relative path"))
-  ))
+  (test-suite "tests for correct return in case a path is given instead of a path-string. 
+              Being given a path should signal, that the path is already resolved and thus hasn't been to 
+              transformed in any way. But since the resolve-path function should serve as a saveguard
+              for any used path being used correctly, even if the ~/ shorthand is used, it should be able
+              to except paths. That way the user doesn't have to keep that in mind and make sure,
+              that he is using a resolved path"
+    (test-equal? "given a path, the same path is getting returned"
+          (resolve-path (string->path "/home/me/test"))
+          (string->path "/home/me/test"))))
+  )
 
 (define delete/create-dir-tests
   (test-suite "tests for creation and deletion of directories"
