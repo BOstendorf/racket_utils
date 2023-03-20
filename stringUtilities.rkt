@@ -14,9 +14,46 @@
   )
 
 
+(define (string-replace** str patterns replacement . further)
+  (cond [(empty? further) str]
+        [(empty? (cdr further)) 
+          (raise-argument-error 'expected-pattern-and-replacement-to-be-provided-as-argument
+                                "(list  (or string? 
+                                            (list string? ...))
+                                        string?) ..."
+                                further)]
+        [(string? patterns) (string-replace*  (string-replace str patterns replacement)
+                                              (first further)
+                                              (second further)
+                                              (cddr further))]
+        [(empty? patterns) (string-replace* str 
+                                            (first further)
+                                            (second further))
+                                            (cddr further)]
+        [(list? patterns) (string-replace*  (string-replace str (car patterns) replacement)
+                                            (cdr patterns)
+                                            replacement
+                                            further)]))
+
+(define/match (string-replace* str patterns replacement . further)
+  [((? string?) (? string?) (? string?) '()) (string-replace str patterns replacement)]
+  [((? string?) (? string?) (? string?) (list-rest pat repl furth)) (string-replace* str pat repl furth)])
+
 ;;; ---------------------------------------------
 ;;; test cases - invoke using thunk execute-tests
 ;;; ---------------------------------------------
+
+(define string-replace*-tests
+  (test-suite "tests for string-replace* :: should replace all patterns provided"
+    (test-equal? 
+          "same behaviour as string-replace if only one source, one pattern and one replacement string are provided as parameters"
+          (string-replace* "string-mit-Minus" "-" "+")
+          "string+mit+Minus")
+    (test-equal? 
+          "provide a second pattern and replacement"
+          (string-replace* "string-mit-Minus" "-" "+" "Minus" "Plus")
+          "string+mit+Plus")
+  ))
 
 (define string-trim-until-tests
   (test-suite "tests for string-trim-until get suffix of string starting with until pattern"
@@ -36,4 +73,5 @@
 
 (define (execute-tests)
   (run-tests string-trim-until-tests)
+  (run-tests string-replace*-tests)
 )
