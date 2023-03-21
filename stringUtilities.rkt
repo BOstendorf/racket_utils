@@ -14,6 +14,12 @@
   )
 
 ;; tested
+(define (string-prefix* str prefixes)
+  (cond [(empty? prefixes) #f]
+        [(string-prefix? str (car prefixes)) #t]
+        [else (string-prefix* str (cdr prefixes))]))
+
+;; tested
 (define (string-replace* str patterns replacement [further '()])
   (letrec 
     ([process-further 
@@ -45,6 +51,25 @@
 ;;; ---------------------------------------------
 ;;; test cases - invoke using thunk execute-tests
 ;;; ---------------------------------------------
+
+(define string-prefix*-tests
+  (test-suite "tests for string-prefix*"
+    (test-true 
+          "String has only prefix present in arguments"
+          (string-prefix* "testString" '("test")))
+    (test-true 
+          "String has first prefix present in arguments"
+          (string-prefix* "testString" '("test" "someother")))
+    (test-true 
+          "String has second prefix present in arguments"
+          (string-prefix* "testString" '("someother" "test")))
+    (test-false
+          "No prefixes supplied as argument"
+          (string-prefix* "testString" '()))
+    (test-false
+          "None of supplied prefixes is prefix of string"
+          (string-prefix* "testString" '("some" "prefix")))
+  ))
 
 (define string-replace*-tests
   (test-suite "tests for string-replace* :: should replace all patterns provided"
@@ -112,4 +137,5 @@
 (define (execute-tests)
   (run-tests string-trim-until-tests)
   (run-tests string-replace*-tests)
+  (run-tests string-prefix*-tests)
 )
