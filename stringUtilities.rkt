@@ -13,31 +13,34 @@
     [else ""])
   )
 
-
-(define (string-replace** str patterns replacement . further)
-  (cond [(empty? further) str]
-        [(empty? (cdr further)) 
-          (raise-argument-error 'expected-pattern-and-replacement-to-be-provided-as-argument
-                                "(list  (or string? 
-                                            (list string? ...))
-                                        string?) ..."
-                                further)]
-        [(string? patterns) (string-replace*  (string-replace str patterns replacement)
-                                              (first further)
-                                              (second further)
-                                              (cddr further))]
-        [(empty? patterns) (string-replace* str 
-                                            (first further)
-                                            (second further))
-                                            (cddr further)]
-        [(list? patterns) (string-replace*  (string-replace str (car patterns) replacement)
-                                            (cdr patterns)
-                                            replacement
-                                            further)]))
-
-(define/match (string-replace* str patterns replacement . further)
-  [((? string?) (? string?) (? string?) '()) (string-replace str patterns replacement)]
-  [((? string?) (? string?) (? string?) (list-rest pat repl furth)) (string-replace* str pat repl furth)])
+;; tested
+(define (string-replace* str patterns replacement [further '()])
+  (letrec 
+    ([process-further 
+            (lambda (str further) 
+                    (cond [(empty? further) str]
+                          [(empty? (cdr further)) 
+                              (raise-argument-error 'expected-pattern-and-replacement-to-be-provided-as-argument
+                                                    "(list  (or string? 
+                                                            (list string? ...))
+                                                            string?) ..."
+                                                    further)]
+                          [else (process-replacement  str 
+                                                      (first further)
+                                                      (second further)
+                                                      (cddr further))]))]
+      [process-replacement 
+            (lambda (str patterns replacement further)
+                    (cond [(string? patterns) (process-further  (string-replace str 
+                                                                                patterns 
+                                                                                replacement)
+                                                                further)]
+                          [(list? patterns) (process-further (foldl (lambda (pat str)
+                                                                            (string-replace str pat replacement))
+                                                                    str
+                                                                    patterns)
+                                                              further)]))])
+    (process-replacement str patterns replacement further)))
 
 ;;; ---------------------------------------------
 ;;; test cases - invoke using thunk execute-tests
@@ -51,8 +54,43 @@
           "string+mit+Minus")
     (test-equal? 
           "provide a second pattern and replacement"
-          (string-replace* "string-mit-Minus" "-" "+" "Minus" "Plus")
+          (string-replace* "string-mit-Minus" "-" "+" '("Minus" "Plus"))
           "string+mit+Plus")
+    (test-equal?
+          "provide a list of patterns with one replacement"
+          (string-replace* "string-mit-Minus" '("-" "Minus") "+")
+          "string+mit++")
+    (test-equal? 
+          "provide a list of patterns with one replacement and further pattern string with replacement"
+          (string-replace* "string-mit-Minus" '("-" "mit") "+" '("Minus" "Plus"))
+          "string+++Plus")
+    (test-equal?
+          "provide a list of patterns with replacement and further list of patterns with replacement"
+          (string-replace* "string-mit-Minus" '("-" "mit") "+" '(("Minus" "string") "Plus"))
+          "Plus+++Plus")
+    (test-equal?
+          "pattern string and further list of patterns"
+          (string-replace* "string-mit-Minus" "mit" "+" '(("Minus" "string") "Plus"))
+          "Plus-+-Plus")
+    (test-equal?
+          "pattern list and multiple further pattern strings"
+          (string-replace* "string-mit-Minus" "mit" "+" '("-" "+" "Minus" "Plus"))
+          "string+++Plus")
+    (test-equal?
+          "pattern list and multiple further pattern lists"
+          (string-replace* "string-mit-Minus" "mit" "+" '("-" "+" ("string" "Minus") "Plus"))
+          "Plus+++Plus")
+    (test-equal?
+          "pattern list and multiple further pattern lists modifying earlier replacement"
+          (string-replace* "string-mit-Minus" "mit" "+" 
+                                              '("-" "+" 
+                                                ("string" "Minus") "Plus" 
+                                                ("Plus+" "+Plus") "+"))
+          "+++")
+    (test-equal?
+          "no pattern to replace present"
+          (string-replace* "string-mit-Minus" "ohne" "+" '(("Plus" "+") "Minus"))
+          "string-mit-Minus")
   ))
 
 (define string-trim-until-tests
