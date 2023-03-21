@@ -4,6 +4,7 @@
           rackunit/text-ui)
 
 (provide  string-trim-until
+          string-replace*
           string-prefix*)
 
 ;; tested

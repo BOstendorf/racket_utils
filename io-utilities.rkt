@@ -2,7 +2,8 @@
 (require  rackunit
           rackunit/text-ui
           utils/listUtilities
-          utils/stringUtilities)
+          utils/stringUtilities
+          2htdp/batch-io)
 
 (provide  
   dir-exists?->delete
@@ -25,7 +26,13 @@
   string->path-extension-string
   file?
   directory?
+  get-file-lines
   )
+
+(define (get-file-lines path-or-path-string?)
+  (read-lines (if (path?  path-or-path-string?) 
+                  (path->string path-or-path-string?) 
+                  path-or-path-string?)))
 
 ;; tested
 (define (increment-file-name file-name)
