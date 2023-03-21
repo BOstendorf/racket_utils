@@ -3,7 +3,8 @@
 (require  rackunit
           rackunit/text-ui)
 
-(provide string-trim-until)
+(provide  string-trim-until
+          string-prefix*)
 
 ;; tested
 (define (string-trim-until str until)
