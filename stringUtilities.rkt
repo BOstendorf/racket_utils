@@ -5,7 +5,22 @@
 
 (provide  string-trim-until
           string-replace*
-          string-prefix*)
+          string-prefix*
+          string-front-pad-to-length)
+
+(define (string-front-pad-to-length str padding-char desired-length)
+  (cond 
+    [(>= (string-length str) 
+          desired-length) str]
+    [(or  (not (string? padding-char))
+          (not (= (string-length padding-char) 
+                  1)))
+      (raise-argument-error 'invalid-padding-char 
+                            "(and (? string?) (app string-length 1))" 
+                            padding-char)]
+    [else (string-front-pad-to-length (string-append padding-char str) 
+                                      padding-char 
+                                      desired-length)]))
 
 ;; tested
 (define (string-trim-until str until)
