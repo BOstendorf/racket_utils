@@ -160,12 +160,11 @@
       (and (delete-directory/files path) #t)
       #t)))
 
-;; tested
 (define (mkdir dir-path)
   (let ([path (resolve-path dir-path)])
     (if (directory-exists? path)
     'directory-exists-already
-    (make-directory path)
+    (make-directory* path)
   )))
 
 ;; tested
