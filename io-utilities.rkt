@@ -27,6 +27,7 @@
   file?
   directory?
   get-file-lines
+  sanitize-file-name
   )
 
 (define (get-file-lines path-or-path-string?)
@@ -208,10 +209,26 @@
 (define (get-name-of-md-file-path file-path)
   (string-trim (path-element->string (file-name-from-path file-path)) ".md"))
 
+(define (sanitize-file-name name-string)
+  (string-replace*  name-string 
+                    (list "#" "%" "?" "!" "|" "&" 
+                          "{" "}" "\\" "<" ">" "*" 
+                          "/" "'" "\"" ":" "@" "`" "=")
+                    ""))
 
 ;;; ---------------------------------------------
 ;;; test cases - invoke using thunk execute-tests
 ;;; ---------------------------------------------
+
+(define sanitize-file-name-tests
+  (let ([test (lambda (special-char) 
+                      (test-equal?  (string-append "remove special char " special-char)
+                                    (sanitize-file-name (string-join (list "na" special-char "me") ""))
+                                    "name"))])
+    (test-suite "test cases for sanitize-file-name"
+      (list (test "#") (test "%") (test "?") (test "!") (test "|") (test "&") 
+            (test "{") (test "}") (test "<") (test ">") (test "*") (test "/") 
+            (test "'") (test ":") (test "@") (test "`") (test "=") (test "\\") (test "\"")))))
 
 (define increment-file-name-tests
   (test-suite "test cases for increment-file-name"
@@ -544,6 +561,7 @@
 
 
 (define (execute-tests) 
+  (run-tests sanitize-file-name-tests)
   (run-tests get-name-of-file-path-tests)
   (run-tests delete/create-dir-tests)
   (run-tests resolve-path-tests)
