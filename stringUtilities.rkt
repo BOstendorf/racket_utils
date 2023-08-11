@@ -6,7 +6,11 @@
 (provide  string-trim-until
           string-replace*
           string-prefix*
-          string-front-pad-to-length)
+          string-front-pad-to-length
+          string-contains-in-order?
+          single-digit-string?
+          number-string?
+          execute-tests)
 
 (define (string-front-pad-to-length str padding-char desired-length)
   (cond 
@@ -33,7 +37,7 @@
 ;; tested
 (define (string-prefix* str prefixes)
   (cond [(empty? prefixes) #f]
-        [(string-prefix? str (car prefixes)) #t]
+        [(string-prefix? str (car prefixes)) (car prefixes)]
         [else (string-prefix* str (cdr prefixes))]))
 
 ;; tested
@@ -65,21 +69,166 @@
                                                               further)]))])
     (process-replacement str patterns replacement further)))
 
+;; tested
+(define (single-digit-string? str)
+  (and (string? str)
+       (equal? (string-length str)
+               1)
+       (member str '("1" "2" "3" "4" "5" "6" "7" "8" "9" "0"))))
+
+;; tested
+(define (number-string? str)
+  (define (loop lst)
+    (cond 
+      [(empty? lst) #t]
+      [(equal? (car lst) "") (loop (cdr lst))]
+      [(single-digit-string? (car lst)) (loop (cdr lst))]
+      [else #f]
+      ))
+  (cond [(not (string? str)) #f]
+        [else (loop (string-split str ""))])
+  )
+
+
+(define (string-contains-in-order? str expected-substrings accepted-seperators)
+  (cond [(empty? expected-substrings) str]
+        [(equal? str "") #f]
+        [(string-prefix? 
+           str 
+           (car expected-substrings)) 
+         (string-contains-in-order? (string-replace str (car expected-substrings) "" #:all? #f)
+                                    (cdr expected-substrings)
+                                    accepted-seperators)]
+        [else (let ([seperator-prefix (string-prefix* str accepted-seperators)])
+                (if 
+                  seperator-prefix
+                  (string-contains-in-order? (string-replace str seperator-prefix "" #:all? #f)
+                                             expected-substrings
+                                             accepted-seperators)
+                  #f))]))
+
 ;;; ---------------------------------------------
 ;;; test cases - invoke using thunk execute-tests
 ;;; ---------------------------------------------
 
+(define string-contains-in-order?-tests
+  (test-suite 
+    "tests for string-contains-in-order?"
+    (test-suite 
+      "positive cases"
+      (test-case "testing strings without seperators"
+                 (check-equal? (string-contains-in-order?
+                                 "hier ist ein string"
+                                 '("hier " "ist")
+                                 '())
+                               " ein string")
+                 (check-equal? (string-contains-in-order?
+                                 "hier ist ein string"
+                                 '()
+                                 '())
+                               "hier ist ein string")
+                 (check-equal? (string-contains-in-order?
+                                 "dis string"
+                                 '("d" "is" " ")
+                                 '())
+                               "string")
+                 )
+      (test-case "testing strings with seperators"
+                 (check-equal? (string-contains-in-order?
+                                 "hier ist ein string"
+                                 '("hier " "string")
+                                 '(" " "ein" "ist"))
+                               "")
+                 (check-equal? (string-contains-in-order?
+                                 "hier ist ein string"
+                                 '("hier" "ein")
+                                 '(" ist "))
+                               " string")
+                 (check-equal? (string-contains-in-order?
+                                 "hier ist ein string"
+                                 '("ist" "ein")
+                                 '("hier" " "))
+                               " string")))
+    (test-case
+      "negative cases"
+      (check-false (string-contains-in-order?
+                     "hier ist ein"
+                     '(" " "hier")
+                     '(" ")))
+      (check-false (string-contains-in-order?
+                     "hier ist ein"
+                     '("ein" "hier")
+                     '(" ist "))))))
+
+(define number-string?-tests
+  (test-suite 
+    "tests for number-string?"
+    (test-suite 
+      "negative cases"
+      (test-case "testing strings that are not number strings"
+                 
+                 (check-false (number-string? "string"))
+                 (check-false (number-string? " 123"))
+                 (check-false (number-string? "0.5.3"))
+                 (check-false (number-string? "0.5"))
+                 (check-false (number-string? "123 string"))
+                 )
+      (test-case "testing non string elements"
+                 (check-false (number-string? 'sym))
+                 (check-false (number-string? '(1 2 3)))
+                 (check-false (number-string? #f))
+                 (check-false (number-string? #t))
+                 (check-false (number-string? 123))
+                 (check-false (number-string? (hash)))
+                 (check-false (number-string? '("1" "23")))
+                 ))
+    (test-suite
+      "positive cases"
+      (test-case "strings that represent numbers"
+                 (check-true (number-string? "123") "test for 123")
+                 (check-true (number-string? "04") "test for 04")
+                 (check-true (number-string? "15646") "test for 15646")
+                 (check-true (number-string? "0") "test for 0")
+                 (check-true (number-string? "0104502") "test for 0104502")
+                 ))))
+
+
+(define single-digit-string?-tests
+  (test-suite 
+    "tests for single-digit-string?"
+    (test-true "test for all correct strings"
+               (foldl (lambda (str akku)
+                        (and (single-digit-string? str)
+                             akku))
+                      #t
+                      '("1" "2" "3" "4" "5" "6" "7" "8" "9" "0")))
+    (test-case "negative cases"
+               (check-false (single-digit-string? "10"))
+               (check-false (single-digit-string? "a"))
+               (check-false (single-digit-string? ""))
+               (check-false (single-digit-string? "some other string"))
+               (check-false (single-digit-string? '()))
+               (check-false (single-digit-string? 'sym))
+               (check-false (single-digit-string? 45))
+               (check-false (single-digit-string? #f))
+               (check-false (single-digit-string? #t))
+               )))
+
 (define string-prefix*-tests
   (test-suite "tests for string-prefix*"
-    (test-true 
+    (test-not-false 
           "String has only prefix present in arguments"
           (string-prefix* "testString" '("test")))
-    (test-true 
+    (test-not-false 
           "String has first prefix present in arguments"
           (string-prefix* "testString" '("test" "someother")))
-    (test-true 
+    (test-not-false 
           "String has second prefix present in arguments"
           (string-prefix* "testString" '("someother" "test")))
+    (test-equal?
+      "empty string as expected prefix"
+      (string-prefix* "testString" '("" "String"))
+      "")
     (test-false
           "No prefixes supplied as argument"
           (string-prefix* "testString" '()))
@@ -155,4 +304,7 @@
   (run-tests string-trim-until-tests)
   (run-tests string-replace*-tests)
   (run-tests string-prefix*-tests)
+  (run-tests single-digit-string?-tests)
+  (run-tests number-string?-tests)
+  (run-tests string-contains-in-order?-tests)
 )

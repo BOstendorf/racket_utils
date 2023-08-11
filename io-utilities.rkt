@@ -28,6 +28,7 @@
   directory?
   get-file-lines
   sanitize-file-name
+  rename-file
   )
 
 (define (get-file-lines path-or-path-string?)
@@ -45,6 +46,17 @@
       [(list 'name str 'ext ext) (string->path (string-append* str "1" (list ext)))]
     ))
   (file-name-from-path (matcher file-name)))
+
+(define (rename-file source-path target-name [keep-extension #t])
+  (let* ([dir-path (path-only source-path)]
+         [res-path (if keep-extension
+                     (path-add-extension (build-path dir-path target-name)
+                                         (path-get-extension source-path))
+                     (build-path dir-path target-name))])
+    (if (copy-directory/files source-path
+                              res-path)
+      (and (delete-directory/files source-path) #t)
+      (displayln (list "rename error of " source-path)))))
 
 (define (move-file source-path target-dir-path [target-file-names #f])
   (let* (
