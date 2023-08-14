@@ -6,6 +6,7 @@
           2htdp/batch-io)
 
 (provide  
+  get-pure-name-of-extension-file-path
   dir-exists?->delete
   mkdir
   resolve-path
@@ -212,6 +213,9 @@
                                     (displayln
                                               (string-join list-of-strings "")
                                               out-file)))))
+
+(define (get-pure-name-of-extension-file-path file-path extension)
+  (string-trim (path-element->string (file-name-from-path file-path)) extension))
 
 ;;tested
 (define (get-name-of-csv-file-path file-path)
